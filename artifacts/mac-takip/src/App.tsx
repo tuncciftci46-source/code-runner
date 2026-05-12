@@ -10,7 +10,15 @@ import MatchDetail from "@/pages/match-detail";
 import LeagueStandings from "@/pages/league-standings";
 import Predictions from "@/pages/predictions";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchInterval: 60_000,
+      staleTime: 30_000,
+      retry: 2,
+    },
+  },
+});
 
 function Router() {
   return (

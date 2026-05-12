@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: Canlı Maç Takip & Analiz API
+  version: 0.2.0
+  description: MacSkor - Canlı Maç Takip & Analiz API
 servers:
   - url: /api
     description: Base API path
@@ -14,17 +14,14 @@ tags:
     description: Match operations
   - name: leagues
     description: League operations
-  - name: teams
-    description: Team operations
-  - name: predictions
-    description: Prediction operations
+  - name: odds
+    description: Odds and predictions
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -38,17 +35,16 @@ paths:
       operationId: listMatches
       tags: [matches]
       summary: List matches
-      description: List matches with optional filters
       parameters:
         - name: status
           in: query
           schema:
             type: string
             enum: [live, upcoming, finished, all]
-        - name: leagueId
+        - name: leagueSlug
           in: query
           schema:
-            type: ["integer", "null"]
+            type: ["string", "null"]
       responses:
         "200":
           description: List of matches
@@ -64,7 +60,6 @@ paths:
       operationId: getLiveMatches
       tags: [matches]
       summary: Get live matches
-      description: Returns all currently live matches
       responses:
         "200":
           description: Live matches
@@ -79,8 +74,7 @@ paths:
     get:
       operationId: getMatchSummary
       tags: [matches]
-      summary: Get match summary
-      description: Dashboard summary of match counts
+      summary: Dashboard summary
       responses:
         "200":
           description: Summary
@@ -99,7 +93,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: Match details
@@ -124,7 +118,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: Match events
@@ -139,7 +133,7 @@ paths:
     get:
       operationId: listLeagues
       tags: [leagues]
-      summary: List leagues
+      summary: List supported leagues
       responses:
         "200":
           description: List of leagues
@@ -150,17 +144,17 @@ paths:
                 items:
                   $ref: "#/components/schemas/League"
 
-  /leagues/{id}/standings:
+  /leagues/{slug}/standings:
     get:
       operationId: getStandings
       tags: [leagues]
       summary: Get league standings
       parameters:
-        - name: id
+        - name: slug
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: League standings
@@ -171,45 +165,45 @@ paths:
                 items:
                   $ref: "#/components/schemas/Standing"
 
-  /predictions:
+  /odds/{matchId}:
     get:
-      operationId: listPredictions
-      tags: [predictions]
-      summary: List match predictions
-      responses:
-        "200":
-          description: Predictions
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Prediction"
-
-  /predictions/{matchId}:
-    get:
-      operationId: getPrediction
-      tags: [predictions]
-      summary: Get prediction for a match
+      operationId: getOdds
+      tags: [odds]
+      summary: Get iddaa-style odds for a match
       parameters:
         - name: matchId
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
-          description: Prediction
+          description: Odds and predictions
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Prediction"
+                $ref: "#/components/schemas/Odds"
         "404":
           description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /odds:
+    get:
+      operationId: listOdds
+      tags: [odds]
+      summary: Get odds for all today's matches
+      responses:
+        "200":
+          description: All odds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Odds"
 
 components:
   schemas:
@@ -218,67 +212,57 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-      required:
-        - error
+      required: [error]
 
     Team:
       type: object
       properties:
         id:
-          type: integer
+          type: string
         name:
           type: string
         shortName:
           type: string
         logo:
           type: string
-        country:
+        color:
           type: string
-      required:
-        - id
-        - name
-        - shortName
-        - logo
-        - country
+        form:
+          type: ["string", "null"]
+      required: [id, name, shortName, logo, color, form]
 
     League:
       type: object
       properties:
-        id:
-          type: integer
+        slug:
+          type: string
         name:
           type: string
         country:
           type: string
         logo:
           type: string
-        season:
-          type: string
-      required:
-        - id
-        - name
-        - country
-        - logo
-        - season
+      required: [slug, name, country, logo]
 
     Match:
       type: object
       properties:
         id:
-          type: integer
-        leagueId:
-          type: integer
+          type: string
+        leagueSlug:
+          type: string
         leagueName:
           type: string
         leagueLogo:
+          type: string
+        leagueCountry:
           type: string
         homeTeam:
           $ref: "#/components/schemas/Team"
@@ -288,28 +272,38 @@ components:
           type: ["integer", "null"]
         awayScore:
           type: ["integer", "null"]
+        homeScoreHT:
+          type: ["integer", "null"]
+        awayScoreHT:
+          type: ["integer", "null"]
         status:
           type: string
           enum: [live, upcoming, finished, halftime]
         minute:
-          type: ["integer", "null"]
+          type: ["string", "null"]
         startTime:
           type: string
         date:
           type: string
+        venue:
+          type: ["string", "null"]
       required:
         - id
-        - leagueId
+        - leagueSlug
         - leagueName
         - leagueLogo
+        - leagueCountry
         - homeTeam
         - awayTeam
         - homeScore
         - awayScore
+        - homeScoreHT
+        - awayScoreHT
         - status
         - minute
         - startTime
         - date
+        - venue
 
     MatchStats:
       type: object
@@ -368,12 +362,14 @@ components:
       type: object
       properties:
         id:
-          type: integer
-        leagueId:
-          type: integer
+          type: string
+        leagueSlug:
+          type: string
         leagueName:
           type: string
         leagueLogo:
+          type: string
+        leagueCountry:
           type: string
         homeTeam:
           $ref: "#/components/schemas/Team"
@@ -383,44 +379,54 @@ components:
           type: ["integer", "null"]
         awayScore:
           type: ["integer", "null"]
+        homeScoreHT:
+          type: ["integer", "null"]
+        awayScoreHT:
+          type: ["integer", "null"]
         status:
           type: string
           enum: [live, upcoming, finished, halftime]
         minute:
-          type: ["integer", "null"]
+          type: ["string", "null"]
         startTime:
           type: string
         date:
           type: string
+        venue:
+          type: ["string", "null"]
         stats:
           $ref: "#/components/schemas/MatchStats"
       required:
         - id
-        - leagueId
+        - leagueSlug
         - leagueName
         - leagueLogo
+        - leagueCountry
         - homeTeam
         - awayTeam
         - homeScore
         - awayScore
+        - homeScoreHT
+        - awayScoreHT
         - status
         - minute
         - startTime
         - date
+        - venue
         - stats
 
     MatchEvent:
       type: object
       properties:
         id:
-          type: integer
+          type: string
         matchId:
-          type: integer
+          type: string
         minute:
-          type: integer
+          type: string
         type:
           type: string
-          enum: [goal, yellow_card, red_card, substitution, penalty, own_goal]
+          enum: [goal, yellow_card, red_card, substitution, penalty, own_goal, var]
         team:
           type: string
           enum: [home, away]
@@ -451,11 +457,14 @@ components:
           type: integer
         totalGoalsToday:
           type: integer
+        totalMatches:
+          type: integer
       required:
         - liveCount
         - upcomingCount
         - finishedCount
         - totalGoalsToday
+        - totalMatches
 
     Standing:
       type: object
@@ -495,35 +504,91 @@ components:
         - points
         - form
 
-    Prediction:
+    ScorePrediction:
+      type: object
+      properties:
+        score:
+          type: string
+        probability:
+          type: number
+      required: [score, probability]
+
+    Odds:
       type: object
       properties:
         matchId:
-          type: integer
-        homeWinProbability:
-          type: number
-        drawProbability:
-          type: number
-        awayWinProbability:
-          type: number
-        predictedScore:
           type: string
+        homeWin:
+          type: number
+        draw:
+          type: number
+        awayWin:
+          type: number
+        homeOdds:
+          type: number
+        drawOdds:
+          type: number
+        awayOdds:
+          type: number
+        btts:
+          type: number
+        noBtts:
+          type: number
+        over25:
+          type: number
+        under25:
+          type: number
+        over15:
+          type: number
+        under15:
+          type: number
+        htHome:
+          type: number
+        htDraw:
+          type: number
+        htAway:
+          type: number
+        htHomeOdds:
+          type: number
+        htDrawOdds:
+          type: number
+        htAwayOdds:
+          type: number
+        topScores:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScorePrediction"
         confidence:
           type: string
           enum: [low, medium, high]
         analysis:
           type: string
-        btts:
-          type: boolean
-        over25:
-          type: boolean
+        expectedGoalsHome:
+          type: number
+        expectedGoalsAway:
+          type: number
       required:
         - matchId
-        - homeWinProbability
-        - drawProbability
-        - awayWinProbability
-        - predictedScore
+        - homeWin
+        - draw
+        - awayWin
+        - homeOdds
+        - drawOdds
+        - awayOdds
+        - btts
+        - noBtts
+        - over25
+        - under25
+        - over15
+        - under15
+        - htHome
+        - htDraw
+        - htAway
+        - htHomeOdds
+        - htDrawOdds
+        - htAwayOdds
+        - topScores
         - confidence
         - analysis
-        - btts
-        - over25
+        - expectedGoalsHome
+        - expectedGoalsAway

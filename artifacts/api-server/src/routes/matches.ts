@@ -1,8 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, matchesTable, matchStatsTable, matchEventsTable, teamsTable, leaguesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
 import {
-  ListMatchesQueryParams,
   ListMatchesResponse,
   GetLiveMatchesResponse,
   GetMatchSummaryResponse,
@@ -10,63 +7,11 @@ import {
   GetMatchResponse,
   GetMatchEventsParams,
   GetMatchEventsResponse,
+  ListMatchesQueryParams,
 } from "@workspace/api-zod";
+import { fetchAllMatchesToday, fetchMatchDetails, mapESPNEventToMatch } from "../lib/espn";
 
 const router: IRouter = Router();
-
-async function buildMatchRow(row: {
-  id: number;
-  leagueId: number;
-  homeScore: number | null;
-  awayScore: number | null;
-  status: string;
-  minute: number | null;
-  startTime: string;
-  date: string;
-  leagueName: string;
-  leagueLogo: string;
-  homeTeamId: number;
-  homeTeamName: string;
-  homeTeamShortName: string;
-  homeTeamLogo: string;
-  homeTeamCountry: string;
-  awayTeamId: number;
-  awayTeamName: string;
-  awayTeamShortName: string;
-  awayTeamLogo: string;
-  awayTeamCountry: string;
-}) {
-  return {
-    id: row.id,
-    leagueId: row.leagueId,
-    leagueName: row.leagueName,
-    leagueLogo: row.leagueLogo,
-    homeTeam: {
-      id: row.homeTeamId,
-      name: row.homeTeamName,
-      shortName: row.homeTeamShortName,
-      logo: row.homeTeamLogo,
-      country: row.homeTeamCountry,
-    },
-    awayTeam: {
-      id: row.awayTeamId,
-      name: row.awayTeamName,
-      shortName: row.awayTeamShortName,
-      logo: row.awayTeamLogo,
-      country: row.awayTeamCountry,
-    },
-    homeScore: row.homeScore,
-    awayScore: row.awayScore,
-    status: row.status as "live" | "upcoming" | "finished" | "halftime",
-    minute: row.minute,
-    startTime: row.startTime,
-    date: row.date,
-  };
-}
-
-const homeTeams = db.$with("homeTeams").as(
-  db.select().from(teamsTable)
-);
 
 router.get("/matches", async (req, res): Promise<void> => {
   const query = ListMatchesQueryParams.safeParse(req.query);
@@ -75,166 +20,74 @@ router.get("/matches", async (req, res): Promise<void> => {
     return;
   }
 
-  const homeTeamAlias = teamsTable;
-  const awayTeamAlias = teamsTable;
+  let matches = await fetchAllMatchesToday();
 
-  const baseQuery = db
-    .select({
-      id: matchesTable.id,
-      leagueId: matchesTable.leagueId,
-      homeScore: matchesTable.homeScore,
-      awayScore: matchesTable.awayScore,
-      status: matchesTable.status,
-      minute: matchesTable.minute,
-      startTime: matchesTable.startTime,
-      date: matchesTable.date,
-      leagueName: leaguesTable.name,
-      leagueLogo: leaguesTable.logo,
-      homeTeamId: matchesTable.homeTeamId,
-      awayTeamId: matchesTable.awayTeamId,
-    })
-    .from(matchesTable)
-    .innerJoin(leaguesTable, eq(matchesTable.leagueId, leaguesTable.id));
-
-  const rows = await baseQuery;
-
-  const teamIds = [...new Set([...rows.map(r => r.homeTeamId), ...rows.map(r => r.awayTeamId)])];
-  const teams = await db.select().from(teamsTable);
-  const teamMap = new Map(teams.map(t => [t.id, t]));
-
-  let filtered = rows;
-  if (query.data.status && query.data.status !== "all") {
-    if (query.data.status === "live") {
-      filtered = rows.filter(r => r.status === "live" || r.status === "halftime");
+  const { status, leagueSlug } = query.data;
+  if (status && status !== "all") {
+    if (status === "live") {
+      matches = matches.filter(m => m.status === "live" || m.status === "halftime");
     } else {
-      filtered = rows.filter(r => r.status === query.data.status);
+      matches = matches.filter(m => m.status === status);
     }
   }
-  if (query.data.leagueId) {
-    filtered = filtered.filter(r => r.leagueId === query.data.leagueId);
+  if (leagueSlug) {
+    matches = matches.filter(m => m.leagueSlug === leagueSlug);
   }
 
-  const result = filtered.map(r => {
-    const home = teamMap.get(r.homeTeamId)!;
-    const away = teamMap.get(r.awayTeamId)!;
-    return {
-      id: r.id,
-      leagueId: r.leagueId,
-      leagueName: r.leagueName,
-      leagueLogo: r.leagueLogo,
-      homeTeam: { id: home.id, name: home.name, shortName: home.shortName, logo: home.logo, country: home.country },
-      awayTeam: { id: away.id, name: away.name, shortName: away.shortName, logo: away.logo, country: away.country },
-      homeScore: r.homeScore,
-      awayScore: r.awayScore,
-      status: r.status as "live" | "upcoming" | "finished" | "halftime",
-      minute: r.minute,
-      startTime: r.startTime,
-      date: r.date,
-    };
-  });
-
-  res.json(ListMatchesResponse.parse(result));
+  res.json(ListMatchesResponse.parse(matches));
 });
 
 router.get("/matches/live", async (_req, res): Promise<void> => {
-  const rows = await db
-    .select({
-      id: matchesTable.id,
-      leagueId: matchesTable.leagueId,
-      homeScore: matchesTable.homeScore,
-      awayScore: matchesTable.awayScore,
-      status: matchesTable.status,
-      minute: matchesTable.minute,
-      startTime: matchesTable.startTime,
-      date: matchesTable.date,
-      leagueName: leaguesTable.name,
-      leagueLogo: leaguesTable.logo,
-      homeTeamId: matchesTable.homeTeamId,
-      awayTeamId: matchesTable.awayTeamId,
-    })
-    .from(matchesTable)
-    .innerJoin(leaguesTable, eq(matchesTable.leagueId, leaguesTable.id));
-
-  const liveRows = rows.filter(r => r.status === "live" || r.status === "halftime");
-  const teams = await db.select().from(teamsTable);
-  const teamMap = new Map(teams.map(t => [t.id, t]));
-
-  const result = liveRows.map(r => {
-    const home = teamMap.get(r.homeTeamId)!;
-    const away = teamMap.get(r.awayTeamId)!;
-    return {
-      id: r.id,
-      leagueId: r.leagueId,
-      leagueName: r.leagueName,
-      leagueLogo: r.leagueLogo,
-      homeTeam: { id: home.id, name: home.name, shortName: home.shortName, logo: home.logo, country: home.country },
-      awayTeam: { id: away.id, name: away.name, shortName: away.shortName, logo: away.logo, country: away.country },
-      homeScore: r.homeScore,
-      awayScore: r.awayScore,
-      status: r.status as "live" | "upcoming" | "finished" | "halftime",
-      minute: r.minute,
-      startTime: r.startTime,
-      date: r.date,
-    };
-  });
-
-  res.json(GetLiveMatchesResponse.parse(result));
+  const matches = await fetchAllMatchesToday();
+  const live = matches.filter(m => m.status === "live" || m.status === "halftime");
+  res.json(GetLiveMatchesResponse.parse(live));
 });
 
 router.get("/matches/summary", async (_req, res): Promise<void> => {
-  const allMatches = await db.select({ status: matchesTable.status, homeScore: matchesTable.homeScore, awayScore: matchesTable.awayScore }).from(matchesTable);
+  const matches = await fetchAllMatchesToday();
+  const liveCount = matches.filter(m => m.status === "live" || m.status === "halftime").length;
+  const upcomingCount = matches.filter(m => m.status === "upcoming").length;
+  const finishedCount = matches.filter(m => m.status === "finished").length;
+  const totalGoalsToday = matches
+    .filter(m => m.status === "finished" || m.status === "live" || m.status === "halftime")
+    .reduce((acc, m) => acc + (m.homeScore ?? 0) + (m.awayScore ?? 0), 0);
 
-  const liveCount = allMatches.filter(m => m.status === "live" || m.status === "halftime").length;
-  const upcomingCount = allMatches.filter(m => m.status === "upcoming").length;
-  const finishedCount = allMatches.filter(m => m.status === "finished").length;
-  const finishedMatches = allMatches.filter(m => m.status === "finished");
-  const totalGoalsToday = finishedMatches.reduce((acc, m) => acc + (m.homeScore ?? 0) + (m.awayScore ?? 0), 0);
-
-  res.json(GetMatchSummaryResponse.parse({ liveCount, upcomingCount, finishedCount, totalGoalsToday }));
+  res.json(GetMatchSummaryResponse.parse({
+    liveCount,
+    upcomingCount,
+    finishedCount,
+    totalGoalsToday,
+    totalMatches: matches.length,
+  }));
 });
 
 router.get("/matches/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetMatchParams.safeParse({ id: parseInt(raw, 10) });
+  const params = GetMatchParams.safeParse({ id: raw });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
-  const rows = await db
-    .select({
-      id: matchesTable.id,
-      leagueId: matchesTable.leagueId,
-      homeScore: matchesTable.homeScore,
-      awayScore: matchesTable.awayScore,
-      status: matchesTable.status,
-      minute: matchesTable.minute,
-      startTime: matchesTable.startTime,
-      date: matchesTable.date,
-      leagueName: leaguesTable.name,
-      leagueLogo: leaguesTable.logo,
-      homeTeamId: matchesTable.homeTeamId,
-      awayTeamId: matchesTable.awayTeamId,
-    })
-    .from(matchesTable)
-    .innerJoin(leaguesTable, eq(matchesTable.leagueId, leaguesTable.id))
-    .where(eq(matchesTable.id, params.data.id));
-
-  if (!rows[0]) {
+  // Find the match in today's scoreboard
+  const allMatches = await fetchAllMatchesToday();
+  const match = allMatches.find(m => m.id === params.data.id);
+  if (!match) {
     res.status(404).json({ error: "Match not found" });
     return;
   }
 
-  const teams = await db.select().from(teamsTable);
-  const teamMap = new Map(teams.map(t => [t.id, t]));
+  // Fetch detailed summary for stats
+  const summary = await fetchMatchDetails(params.data.id) as {
+    boxscore?: {
+      teams?: Array<{
+        team: { id: string };
+        statistics?: Array<{ name: string; displayValue: string }>;
+      }>;
+    };
+  } | null;
 
-  const r = rows[0];
-  const home = teamMap.get(r.homeTeamId)!;
-  const away = teamMap.get(r.awayTeamId)!;
-
-  const [statsRow] = await db.select().from(matchStatsTable).where(eq(matchStatsTable.matchId, r.id));
-
-  const stats = statsRow ?? {
+  const defaultStats = {
     homePossession: 50, awayPossession: 50,
     homeShots: 0, awayShots: 0,
     homeShotsOnTarget: 0, awayShotsOnTarget: 0,
@@ -245,68 +98,124 @@ router.get("/matches/:id", async (req, res): Promise<void> => {
     homeOffsides: 0, awayOffsides: 0,
   };
 
-  const result = {
-    id: r.id,
-    leagueId: r.leagueId,
-    leagueName: r.leagueName,
-    leagueLogo: r.leagueLogo,
-    homeTeam: { id: home.id, name: home.name, shortName: home.shortName, logo: home.logo, country: home.country },
-    awayTeam: { id: away.id, name: away.name, shortName: away.shortName, logo: away.logo, country: away.country },
-    homeScore: r.homeScore,
-    awayScore: r.awayScore,
-    status: r.status as "live" | "upcoming" | "finished" | "halftime",
-    minute: r.minute,
-    startTime: r.startTime,
-    date: r.date,
-    stats: {
-      homePossession: stats.homePossession,
-      awayPossession: stats.awayPossession,
-      homeShots: stats.homeShots,
-      awayShots: stats.awayShots,
-      homeShotsOnTarget: stats.homeShotsOnTarget,
-      awayShotsOnTarget: stats.awayShotsOnTarget,
-      homeCorners: stats.homeCorners,
-      awayCorners: stats.awayCorners,
-      homeFouls: stats.homeFouls,
-      awayFouls: stats.awayFouls,
-      homeYellowCards: stats.homeYellowCards,
-      awayYellowCards: stats.awayYellowCards,
-      homeRedCards: stats.homeRedCards,
-      awayRedCards: stats.awayRedCards,
-      homeOffsides: stats.homeOffsides,
-      awayOffsides: stats.awayOffsides,
-    },
-  };
+  let stats = defaultStats;
 
+  if (summary?.boxscore?.teams) {
+    const homeTeamStats = summary.boxscore.teams.find(
+      t => t.team.id === match.homeTeam.id
+    )?.statistics || [];
+    const awayTeamStats = summary.boxscore.teams.find(
+      t => t.team.id === match.awayTeam.id
+    )?.statistics || [];
+
+    const getStat = (arr: Array<{ name: string; displayValue: string }>, name: string): number => {
+      const s = arr.find(s => s.name === name);
+      return s ? parseInt(s.displayValue, 10) || 0 : 0;
+    };
+
+    const homePoss = getStat(homeTeamStats, "possessionPct");
+    const awayPoss = getStat(awayTeamStats, "possessionPct");
+
+    stats = {
+      homePossession: homePoss || 50,
+      awayPossession: awayPoss || (homePoss ? 100 - homePoss : 50),
+      homeShots: getStat(homeTeamStats, "totalShots"),
+      awayShots: getStat(awayTeamStats, "totalShots"),
+      homeShotsOnTarget: getStat(homeTeamStats, "shotsOnTarget"),
+      awayShotsOnTarget: getStat(awayTeamStats, "shotsOnTarget"),
+      homeCorners: getStat(homeTeamStats, "corners"),
+      awayCorners: getStat(awayTeamStats, "corners"),
+      homeFouls: getStat(homeTeamStats, "foulsCommitted"),
+      awayFouls: getStat(awayTeamStats, "foulsCommitted"),
+      homeYellowCards: getStat(homeTeamStats, "yellowCards"),
+      awayYellowCards: getStat(awayTeamStats, "yellowCards"),
+      homeRedCards: getStat(homeTeamStats, "redCards"),
+      awayRedCards: getStat(awayTeamStats, "redCards"),
+      homeOffsides: getStat(homeTeamStats, "offsides"),
+      awayOffsides: getStat(awayTeamStats, "offsides"),
+    };
+  }
+
+  const result = { ...match, stats };
   res.json(GetMatchResponse.parse(result));
 });
 
 router.get("/matches/:id/events", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetMatchEventsParams.safeParse({ id: parseInt(raw, 10) });
+  const params = GetMatchEventsParams.safeParse({ id: raw });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
-  const events = await db
-    .select()
-    .from(matchEventsTable)
-    .where(eq(matchEventsTable.matchId, params.data.id))
-    .orderBy(matchEventsTable.minute);
+  const summary = await fetchMatchDetails(params.data.id) as {
+    plays?: Array<{
+      id?: string;
+      clock?: { displayValue?: string };
+      team?: { id?: string };
+      type?: { id?: string; text?: string };
+      athletesInvolved?: Array<{ displayName: string }>;
+      text?: string;
+      scoringPlay?: boolean;
+      penaltyKick?: boolean;
+    }>;
+    header?: {
+      competitions?: Array<{
+        competitors?: Array<{ homeAway: string; team: { id: string } }>;
+      }>;
+    };
+  } | null;
 
-  const result = events.map(e => ({
-    id: e.id,
-    matchId: e.matchId,
-    minute: e.minute,
-    type: e.type as "goal" | "yellow_card" | "red_card" | "substitution" | "penalty" | "own_goal",
-    team: e.team as "home" | "away",
-    playerName: e.playerName,
-    assistName: e.assistName ?? null,
-    description: e.description ?? null,
-  }));
+  if (!summary) {
+    res.json(GetMatchEventsResponse.parse([]));
+    return;
+  }
 
-  res.json(GetMatchEventsResponse.parse(result));
+  const allMatches = await fetchAllMatchesToday();
+  const match = allMatches.find(m => m.id === params.data.id);
+
+  const homeId = match?.homeTeam.id;
+  const awayId = match?.awayTeam.id;
+
+  const plays = summary.plays || [];
+  const events = plays
+    .filter(p => p.type?.text && (
+      p.scoringPlay ||
+      p.type.text.toLowerCase().includes("goal") ||
+      p.type.text.toLowerCase().includes("yellow") ||
+      p.type.text.toLowerCase().includes("red") ||
+      p.type.text.toLowerCase().includes("substitut") ||
+      p.type.text.toLowerCase().includes("penalty")
+    ))
+    .map((p, idx) => {
+      const typeText = (p.type?.text || "").toLowerCase();
+      let eventType: "goal" | "yellow_card" | "red_card" | "substitution" | "penalty" | "own_goal" | "var" = "goal";
+      if (typeText.includes("yellow")) eventType = "yellow_card";
+      else if (typeText.includes("red")) eventType = "red_card";
+      else if (typeText.includes("substitut")) eventType = "substitution";
+      else if (typeText.includes("penalty") || p.penaltyKick) eventType = "penalty";
+      else if (typeText.includes("own goal")) eventType = "own_goal";
+
+      const teamId = p.team?.id;
+      const team: "home" | "away" = teamId === homeId ? "home" : "away";
+
+      const athletes = p.athletesInvolved || [];
+      const playerName = athletes[0]?.displayName || "Bilinmiyor";
+      const assistName = athletes[1]?.displayName || null;
+
+      return {
+        id: p.id || `evt-${idx}`,
+        matchId: params.data.id,
+        minute: p.clock?.displayValue || "?",
+        type: eventType,
+        team,
+        playerName,
+        assistName,
+        description: p.text || null,
+      };
+    });
+
+  res.json(GetMatchEventsResponse.parse(events));
 });
 
 export default router;
