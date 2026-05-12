@@ -3,13 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Canlı Maç Takip & Analiz API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: matches
+    description: Match operations
+  - name: leagues
+    description: League operations
+  - name: teams
+    description: Team operations
+  - name: predictions
+    description: Prediction operations
 paths:
   /healthz:
     get:
@@ -24,6 +32,185 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /matches:
+    get:
+      operationId: listMatches
+      tags: [matches]
+      summary: List matches
+      description: List matches with optional filters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [live, upcoming, finished, all]
+        - name: leagueId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+
+  /matches/live:
+    get:
+      operationId: getLiveMatches
+      tags: [matches]
+      summary: Get live matches
+      description: Returns all currently live matches
+      responses:
+        "200":
+          description: Live matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Match"
+
+  /matches/summary:
+    get:
+      operationId: getMatchSummary
+      tags: [matches]
+      summary: Get match summary
+      description: Dashboard summary of match counts
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchSummary"
+
+  /matches/{id}:
+    get:
+      operationId: getMatch
+      tags: [matches]
+      summary: Get match details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Match details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /matches/{id}/events:
+    get:
+      operationId: getMatchEvents
+      tags: [matches]
+      summary: Get match events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Match events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MatchEvent"
+
+  /leagues:
+    get:
+      operationId: listLeagues
+      tags: [leagues]
+      summary: List leagues
+      responses:
+        "200":
+          description: List of leagues
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/League"
+
+  /leagues/{id}/standings:
+    get:
+      operationId: getStandings
+      tags: [leagues]
+      summary: Get league standings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: League standings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Standing"
+
+  /predictions:
+    get:
+      operationId: listPredictions
+      tags: [predictions]
+      summary: List match predictions
+      responses:
+        "200":
+          description: Predictions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Prediction"
+
+  /predictions/{matchId}:
+    get:
+      operationId: getPrediction
+      tags: [predictions]
+      summary: Get prediction for a match
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Prediction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prediction"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +221,309 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Team:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        shortName:
+          type: string
+        logo:
+          type: string
+        country:
+          type: string
+      required:
+        - id
+        - name
+        - shortName
+        - logo
+        - country
+
+    League:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        country:
+          type: string
+        logo:
+          type: string
+        season:
+          type: string
+      required:
+        - id
+        - name
+        - country
+        - logo
+        - season
+
+    Match:
+      type: object
+      properties:
+        id:
+          type: integer
+        leagueId:
+          type: integer
+        leagueName:
+          type: string
+        leagueLogo:
+          type: string
+        homeTeam:
+          $ref: "#/components/schemas/Team"
+        awayTeam:
+          $ref: "#/components/schemas/Team"
+        homeScore:
+          type: ["integer", "null"]
+        awayScore:
+          type: ["integer", "null"]
+        status:
+          type: string
+          enum: [live, upcoming, finished, halftime]
+        minute:
+          type: ["integer", "null"]
+        startTime:
+          type: string
+        date:
+          type: string
+      required:
+        - id
+        - leagueId
+        - leagueName
+        - leagueLogo
+        - homeTeam
+        - awayTeam
+        - homeScore
+        - awayScore
+        - status
+        - minute
+        - startTime
+        - date
+
+    MatchStats:
+      type: object
+      properties:
+        homePossession:
+          type: integer
+        awayPossession:
+          type: integer
+        homeShots:
+          type: integer
+        awayShots:
+          type: integer
+        homeShotsOnTarget:
+          type: integer
+        awayShotsOnTarget:
+          type: integer
+        homeCorners:
+          type: integer
+        awayCorners:
+          type: integer
+        homeFouls:
+          type: integer
+        awayFouls:
+          type: integer
+        homeYellowCards:
+          type: integer
+        awayYellowCards:
+          type: integer
+        homeRedCards:
+          type: integer
+        awayRedCards:
+          type: integer
+        homeOffsides:
+          type: integer
+        awayOffsides:
+          type: integer
+      required:
+        - homePossession
+        - awayPossession
+        - homeShots
+        - awayShots
+        - homeShotsOnTarget
+        - awayShotsOnTarget
+        - homeCorners
+        - awayCorners
+        - homeFouls
+        - awayFouls
+        - homeYellowCards
+        - awayYellowCards
+        - homeRedCards
+        - awayRedCards
+        - homeOffsides
+        - awayOffsides
+
+    MatchDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        leagueId:
+          type: integer
+        leagueName:
+          type: string
+        leagueLogo:
+          type: string
+        homeTeam:
+          $ref: "#/components/schemas/Team"
+        awayTeam:
+          $ref: "#/components/schemas/Team"
+        homeScore:
+          type: ["integer", "null"]
+        awayScore:
+          type: ["integer", "null"]
+        status:
+          type: string
+          enum: [live, upcoming, finished, halftime]
+        minute:
+          type: ["integer", "null"]
+        startTime:
+          type: string
+        date:
+          type: string
+        stats:
+          $ref: "#/components/schemas/MatchStats"
+      required:
+        - id
+        - leagueId
+        - leagueName
+        - leagueLogo
+        - homeTeam
+        - awayTeam
+        - homeScore
+        - awayScore
+        - status
+        - minute
+        - startTime
+        - date
+        - stats
+
+    MatchEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        matchId:
+          type: integer
+        minute:
+          type: integer
+        type:
+          type: string
+          enum: [goal, yellow_card, red_card, substitution, penalty, own_goal]
+        team:
+          type: string
+          enum: [home, away]
+        playerName:
+          type: string
+        assistName:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+      required:
+        - id
+        - matchId
+        - minute
+        - type
+        - team
+        - playerName
+        - assistName
+        - description
+
+    MatchSummary:
+      type: object
+      properties:
+        liveCount:
+          type: integer
+        upcomingCount:
+          type: integer
+        finishedCount:
+          type: integer
+        totalGoalsToday:
+          type: integer
+      required:
+        - liveCount
+        - upcomingCount
+        - finishedCount
+        - totalGoalsToday
+
+    Standing:
+      type: object
+      properties:
+        rank:
+          type: integer
+        team:
+          $ref: "#/components/schemas/Team"
+        played:
+          type: integer
+        won:
+          type: integer
+        drawn:
+          type: integer
+        lost:
+          type: integer
+        goalsFor:
+          type: integer
+        goalsAgainst:
+          type: integer
+        goalDifference:
+          type: integer
+        points:
+          type: integer
+        form:
+          type: string
+      required:
+        - rank
+        - team
+        - played
+        - won
+        - drawn
+        - lost
+        - goalsFor
+        - goalsAgainst
+        - goalDifference
+        - points
+        - form
+
+    Prediction:
+      type: object
+      properties:
+        matchId:
+          type: integer
+        homeWinProbability:
+          type: number
+        drawProbability:
+          type: number
+        awayWinProbability:
+          type: number
+        predictedScore:
+          type: string
+        confidence:
+          type: string
+          enum: [low, medium, high]
+        analysis:
+          type: string
+        btts:
+          type: boolean
+        over25:
+          type: boolean
+      required:
+        - matchId
+        - homeWinProbability
+        - drawProbability
+        - awayWinProbability
+        - predictedScore
+        - confidence
+        - analysis
+        - btts
+        - over25
