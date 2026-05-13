@@ -31,6 +31,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "MacSkor API", version: "0.2.0" });
+});
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "healthy" });
+});
+
 app.use("/api", router);
 
 const publicDir = path.resolve(import.meta.dirname, "../../mac-takip/dist/public");
