@@ -5,9 +5,8 @@ import {
   GetStandingsParams,
 } from "@workspace/api-zod";
 import { fetchLeagueStandings } from "../lib/espn";
-import { SUPPORTED_LEAGUES } from "@workspace/db-sqlite";
+import { SUPPORTED_LEAGUES, getDb, getLeagueBySlug, getStandingsWithTeams, type StandingTeamRow } from "@workspace/db-sqlite";
 import { syncAllStandings, syncSingleLeague } from "../lib/standings-sync";
-import { getDb, getLeagueBySlug, getStandingsWithTeams } from "@workspace/db-sqlite";
 
 const router: IRouter = Router();
 
@@ -51,7 +50,7 @@ router.get("/leagues/:slug/standings", async (req, res): Promise<void> => {
       const rows = getStandingsWithTeams(db, league.id);
       db.close();
       if (rows.length > 0) {
-        const mapped = rows.map((r) => ({
+        const mapped = rows.map((r: StandingTeamRow) => ({
           rank: r.rank,
           team: {
             id: r.teamEspnId,

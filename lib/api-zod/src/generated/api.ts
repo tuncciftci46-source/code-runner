@@ -303,3 +303,25 @@ export const ListOddsResponseItem = zod.object({
   expectedGoalsAway: zod.number(),
 });
 export const ListOddsResponse = zod.array(ListOddsResponseItem);
+
+/**
+ * @summary List predictions
+ */
+export const GetPredictionParams = zod.object({
+  matchId: zod.coerce.number(),
+});
+
+export const GetPredictionResponse = zod.object({
+  id: zod.number(),
+  matchId: zod.number(),
+  homeWinProbability: zod.number(),
+  drawProbability: zod.number(),
+  awayWinProbability: zod.number(),
+  predictedScore: zod.string(),
+  confidence: zod.enum(["low", "medium", "high"]),
+  analysis: zod.string(),
+  btts: zod.boolean(),
+  over25: zod.boolean(),
+});
+
+export const ListPredictionsResponse = zod.array(GetPredictionResponse);

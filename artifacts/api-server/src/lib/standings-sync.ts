@@ -1,4 +1,4 @@
-import { getDb, upsertLeague, upsertTeam, clearStandings, insertStandings, SUPPORTED_LEAGUES } from "@workspace/db-sqlite";
+import { getDb, upsertLeague, upsertTeam, clearStandings, insertStandings, SUPPORTED_LEAGUES, type LeagueInfo } from "@workspace/db-sqlite";
 import { fetchLeagueStandings } from "./espn";
 import { logger } from "./logger";
 
@@ -124,7 +124,7 @@ export async function syncAllStandings() {
 
 export async function syncSingleLeague(slug: string) {
   const leagues = SUPPORTED_LEAGUES;
-  const league = leagues.find(l => l.slug === slug);
+  const league = leagues.find((l: LeagueInfo) => l.slug === slug);
   if (!league) {
     throw new Error(`Unknown league slug: ${slug}`);
   }

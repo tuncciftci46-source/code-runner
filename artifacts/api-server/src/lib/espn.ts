@@ -225,7 +225,9 @@ export function mapESPNEventToMatch(event: ESPNEvent) {
   };
 }
 
-export async function fetchAllMatchesToday(): Promise<ReturnType<typeof mapESPNEventToMatch>[]> {
+type MatchData = NonNullable<ReturnType<typeof mapESPNEventToMatch>>;
+
+export async function fetchAllMatchesToday(): Promise<MatchData[]> {
   try {
     const data = await fetchWithCache<ESPNScoreboardResponse>(
       `${ESPN_BASE}/all/scoreboard`,
@@ -234,7 +236,7 @@ export async function fetchAllMatchesToday(): Promise<ReturnType<typeof mapESPNE
     const events = data.events || [];
     return events
       .map(e => mapESPNEventToMatch(e))
-      .filter((m): m is NonNullable<ReturnType<typeof mapESPNEventToMatch>> => m !== null);
+      .filter((m): m is MatchData => m !== null);
   } catch (err) {
     logger.error({ err }, "Failed to fetch ESPN scoreboard");
     return [];
