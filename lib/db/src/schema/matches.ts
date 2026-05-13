@@ -81,3 +81,7 @@ export const standingsTable = pgTable("standings", {
 export const insertMatchSchema = createInsertSchema(matchesTable).omit({ id: true });
 export type InsertMatch = z.infer<typeof insertMatchSchema>;
 export type Match = typeof matchesTable.$inferSelect;
+
+export const insertStandingSchema = createInsertSchema(standingsTable).omit({ id: true });
+export type InsertStanding = z.infer<typeof insertStandingSchema>;
+export type Standing = typeof standingsTable.$inferSelect;

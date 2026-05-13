@@ -8,6 +8,7 @@ export const teamsTable = pgTable("teams", {
   shortName: text("short_name").notNull(),
   logo: text("logo").notNull(),
   country: text("country").notNull(),
+  espnId: text("espn_id").notNull().unique(),
 });
 
 export const insertTeamSchema = createInsertSchema(teamsTable).omit({ id: true });

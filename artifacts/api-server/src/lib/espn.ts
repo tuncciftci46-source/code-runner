@@ -1,3 +1,4 @@
+import { SUPPORTED_LEAGUES, getLeagueInfo } from "@workspace/db-sqlite";
 import { logger } from "./logger";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
@@ -74,7 +75,6 @@ interface ESPNScoreboardResponse {
   events?: ESPNEvent[];
 }
 
-// Simple in-memory cache
 const cache: Map<string, { data: unknown; expiry: number }> = new Map();
 
 async function fetchWithCache<T>(url: string, ttlMs = 60_000): Promise<T> {
@@ -92,20 +92,6 @@ async function fetchWithCache<T>(url: string, ttlMs = 60_000): Promise<T> {
   return data;
 }
 
-const SUPPORTED_LEAGUES = [
-  { slug: "eng.1", name: "Premier Lig", country: "İngiltere", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/23.png" },
-  { slug: "esp.1", name: "La Liga", country: "İspanya", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/15.png" },
-  { slug: "ger.1", name: "Bundesliga", country: "Almanya", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/19.png" },
-  { slug: "ita.1", name: "Serie A", country: "İtalya", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/12.png" },
-  { slug: "fra.1", name: "Ligue 1", country: "Fransa", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/9.png" },
-  { slug: "tur.1", name: "Süper Lig", country: "Türkiye", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/30.png" },
-  { slug: "uefa.champions", name: "Şampiyonlar Ligi", country: "Avrupa", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/2.png" },
-  { slug: "uefa.europa", name: "Avrupa Ligi", country: "Avrupa", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/2073.png" },
-  { slug: "usa.1", name: "MLS", country: "ABD", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/20098.png" },
-  { slug: "ned.1", name: "Eredivisie", country: "Hollanda", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/11.png" },
-  { slug: "por.1", name: "Primeira Liga", country: "Portekiz", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/13.png" },
-];
-
 function slugFromSeasonSlug(seasonSlug?: string): string {
   if (!seasonSlug) return "other";
   if (seasonSlug.includes("premier-league") || seasonSlug.includes("english-premier")) return "eng.1";
@@ -116,16 +102,58 @@ function slugFromSeasonSlug(seasonSlug?: string): string {
   if (seasonSlug.includes("super-lig") || seasonSlug.includes("turkish")) return "tur.1";
   if (seasonSlug.includes("champions")) return "uefa.champions";
   if (seasonSlug.includes("europa")) return "uefa.europa";
-  if (seasonSlug.includes("mls") || seasonSlug.includes("major-league")) return "usa.1";
   if (seasonSlug.includes("eredivisie") || seasonSlug.includes("dutch")) return "ned.1";
   if (seasonSlug.includes("primeira") || seasonSlug.includes("portuguese")) return "por.1";
+  if (seasonSlug.includes("mls") || seasonSlug.includes("major-league")) return "usa.1";
+  if (seasonSlug.includes("championship") || seasonSlug.includes("efl")) return "eng.2";
+  if (seasonSlug.includes("league-one")) return "eng.3";
+  if (seasonSlug.includes("league-two")) return "eng.4";
+  if (seasonSlug.includes("segunda")) return "esp.2";
+  if (seasonSlug.includes("2-bundesliga") || seasonSlug.includes("zweite")) return "ger.2";
+  if (seasonSlug.includes("serie-b")) return "ita.2";
+  if (seasonSlug.includes("ligue-2")) return "fra.2";
+  if (seasonSlug.includes("eerste") || seasonSlug.includes("jupiler")) return "ned.2";
+  if (seasonSlug.includes("liga-portugal-2") || seasonSlug.includes("segunda-liga")) return "por.2";
+  if (seasonSlug.includes("1-lig") || seasonSlug.includes("tff")) return "tur.2";
+  if (seasonSlug.includes("belgian") || seasonSlug.includes("jupiler-pro")) return "bel.1";
+  if (seasonSlug.includes("scottish") || seasonSlug.includes("premiership")) return "sco.1";
+  if (seasonSlug.includes("swiss") || seasonSlug.includes("super-league")) return "sui.1";
+  if (seasonSlug.includes("austrian") || seasonSlug.includes("tipico")) return "aut.1";
+  if (seasonSlug.includes("greek") || seasonSlug.includes("super-league-greece")) return "gre.1";
+  if (seasonSlug.includes("danish") || seasonSlug.includes("3f")) return "den.1";
+  if (seasonSlug.includes("allsvenskan") || seasonSlug.includes("swedish")) return "swe.1";
+  if (seasonSlug.includes("eliteserien") || seasonSlug.includes("norwegian")) return "nor.1";
+  if (seasonSlug.includes("croatian") || seasonSlug.includes("hnl")) return "cro.1";
+  if (seasonSlug.includes("czech") || seasonSlug.includes("fortuna")) return "cze.1";
+  if (seasonSlug.includes("polish") || seasonSlug.includes("ekstraklasa")) return "pol.1";
+  if (seasonSlug.includes("ukrainian") || seasonSlug.includes("upl")) return "ukr.1";
+  if (seasonSlug.includes("romanian") || seasonSlug.includes("liga-1")) return "rom.1";
+  if (seasonSlug.includes("hungarian") || seasonSlug.includes("nemzeti")) return "hun.1";
+  if (seasonSlug.includes("serbian") || seasonSlug.includes("superliga")) return "srb.1";
+  if (seasonSlug.includes("bulgarian") || seasonSlug.includes("parva")) return "bul.1";
+  if (seasonSlug.includes("russian") || seasonSlug.includes("rpl")) return "rus.1";
+  if (seasonSlug.includes("brazilian") || seasonSlug.includes("serie-a")) return "bra.1";
+  if (seasonSlug.includes("serie-b-brazil")) return "bra.2";
+  if (seasonSlug.includes("argentine") || seasonSlug.includes("primera-division")) return "arg.1";
+  if (seasonSlug.includes("liga-mx") || seasonSlug.includes("mexican")) return "mex.1";
+  if (seasonSlug.includes("chilean") || seasonSlug.includes("primera-chile")) return "chl.1";
+  if (seasonSlug.includes("colombian") || seasonSlug.includes("primera-colombia")) return "col.1";
+  if (seasonSlug.includes("peruvian") || seasonSlug.includes("liga-1-peru")) return "per.1";
+  if (seasonSlug.includes("uruguayan") || seasonSlug.includes("primera-uruguay")) return "uru.1";
+  if (seasonSlug.includes("japanese") || seasonSlug.includes("j1")) return "jpn.1";
+  if (seasonSlug.includes("k-league") || seasonSlug.includes("korean")) return "kor.1";
+  if (seasonSlug.includes("saudi") || seasonSlug.includes("spl")) return "sau.1";
+  if (seasonSlug.includes("uae") || seasonSlug.includes("arabian")) return "are.1";
+  if (seasonSlug.includes("qatar") || seasonSlug.includes("qsl")) return "qat.1";
+  if (seasonSlug.includes("chinese") || seasonSlug.includes("csl")) return "chi.1";
+  if (seasonSlug.includes("a-league") || seasonSlug.includes("australian")) return "aus.1";
+  if (seasonSlug.includes("egyptian") || seasonSlug.includes("epl")) return "egy.1";
+  if (seasonSlug.includes("south-african") || seasonSlug.includes("psl")) return "rsa.1";
+  if (seasonSlug.includes("conference")) return "uefa.conference";
+  if (seasonSlug.includes("libertadores") || seasonSlug.includes("conmebol")) return "copa.libertadores";
+  if (seasonSlug.includes("sudamericana")) return "copa.sudamericana";
+  if (seasonSlug.includes("afc") || seasonSlug.includes("champions-league")) return "afc.champions";
   return "other";
-}
-
-function leagueInfoFromSlug(slug: string) {
-  const known = SUPPORTED_LEAGUES.find(l => l.slug === slug);
-  if (known) return known;
-  return { slug, name: "Diğer", country: "Dünya", logo: "https://a.espncdn.com/i/leaguelogos/soccer/500/1.png" };
 }
 
 function espnStatusToOurs(statusName: string): "live" | "upcoming" | "finished" | "halftime" {
@@ -156,7 +184,7 @@ export function mapESPNEventToMatch(event: ESPNEvent) {
   if (!home || !away) return null;
 
   const leagueSlug = slugFromSeasonSlug(event.season?.slug);
-  const leagueInfo = leagueInfoFromSlug(leagueSlug);
+  const leagueInfo = getLeagueInfo(leagueSlug);
   const status = espnStatusToOurs(comp.status.type.name);
 
   const date = new Date(event.date);
@@ -231,14 +259,13 @@ export async function fetchLeagueStandings(leagueSlug: string) {
     const data = await fetchWithCache<{
       children?: Array<{
         standings?: {
-          entries?: unknown[];
+          entries?: Array<Record<string, unknown>>;
         };
       }>;
     }>(
       `https://site.api.espn.com/apis/v2/sports/soccer/${leagueSlug}/standings`,
       300_000
     );
-    // The standings are nested under children[0].standings
     const standings = data.children?.[0]?.standings;
     return standings ? { standings } : null;
   } catch (err) {
@@ -247,10 +274,4 @@ export async function fetchLeagueStandings(leagueSlug: string) {
   }
 }
 
-export function getSupportedLeagues() {
-  return SUPPORTED_LEAGUES;
-}
 
-export function getLeagueInfo(slug: string) {
-  return leagueInfoFromSlug(slug);
-}

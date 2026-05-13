@@ -8,6 +8,7 @@ export const leaguesTable = pgTable("leagues", {
   country: text("country").notNull(),
   logo: text("logo").notNull(),
   season: text("season").notNull(),
+  slug: text("slug").notNull().unique(),
 });
 
 export const insertLeagueSchema = createInsertSchema(leaguesTable).omit({ id: true });

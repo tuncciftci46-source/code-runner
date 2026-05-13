@@ -4,13 +4,35 @@ import {
   GetStandingsResponse,
   GetStandingsParams,
 } from "@workspace/api-zod";
-import { getSupportedLeagues, fetchLeagueStandings } from "../lib/espn";
+import { fetchLeagueStandings } from "../lib/espn";
+import { SUPPORTED_LEAGUES } from "@workspace/db-sqlite";
+import { syncAllStandings, syncSingleLeague } from "../lib/standings-sync";
+import { getDb, getLeagueBySlug, getStandingsWithTeams } from "@workspace/db-sqlite";
 
 const router: IRouter = Router();
 
 router.get("/leagues", async (_req, res): Promise<void> => {
-  const leagues = getSupportedLeagues();
+  const leagues = SUPPORTED_LEAGUES;
   res.json(ListLeaguesResponse.parse(leagues));
+});
+
+router.post("/leagues/sync", async (_req, res): Promise<void> => {
+  try {
+    const result = await syncAllStandings();
+    res.json({ message: "Sync completed", ...result });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Sync failed" });
+  }
+});
+
+router.post("/leagues/:slug/sync", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+  try {
+    await syncSingleLeague(raw);
+    res.json({ message: `Sync completed for ${raw}` });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Sync failed" });
+  }
 });
 
 router.get("/leagues/:slug/standings", async (req, res): Promise<void> => {
@@ -21,6 +43,44 @@ router.get("/leagues/:slug/standings", async (req, res): Promise<void> => {
     return;
   }
 
+  // Try SQLite DB first
+  try {
+    const db = getDb();
+    const league = getLeagueBySlug(db, params.data.slug);
+    if (league) {
+      const rows = getStandingsWithTeams(db, league.id);
+      db.close();
+      if (rows.length > 0) {
+        const mapped = rows.map((r) => ({
+          rank: r.rank,
+          team: {
+            id: r.teamEspnId,
+            name: r.teamName,
+            shortName: r.teamShortName,
+            logo: r.teamLogo,
+            color: "",
+            form: null as string | null,
+          },
+          played: r.played,
+          won: r.won,
+          drawn: r.drawn,
+          lost: r.lost,
+          goalsFor: r.goalsFor,
+          goalsAgainst: r.goalsAgainst,
+          goalDifference: r.goalDifference,
+          points: r.points,
+          form: r.form,
+        }));
+        res.json(GetStandingsResponse.parse(mapped));
+        return;
+      }
+    }
+    db.close();
+  } catch {
+    // DB not available, fallback to ESPN
+  }
+
+  // Fallback to ESPN live API
   const data = await fetchLeagueStandings(params.data.slug) as {
     standings?: {
       entries?: Array<{
