@@ -5,14 +5,16 @@ import {
   useGetMatch,
   useGetMatchEvents,
   useGetOdds,
+  useGetMatchXgAnalysis,
   getGetMatchQueryKey,
   getGetMatchEventsQueryKey,
   getGetOddsQueryKey,
+  getGetMatchXgAnalysisQueryKey,
   type MatchEvent,
 } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Clock, AlertTriangle, ArrowRightLeft, ChevronLeft, Activity } from "lucide-react";
+import { Clock, AlertTriangle, ArrowRightLeft, ChevronLeft, Activity, Target, BarChart3, TrendingUp } from "lucide-react";
 
 export default function MatchDetail() {
   const params = useParams();
@@ -29,6 +31,10 @@ export default function MatchDetail() {
 
   const { data: odds, isLoading: oddsLoading } = useGetOdds(matchId, {
     query: { queryKey: getGetOddsQueryKey(matchId), enabled: !!matchId }
+  });
+
+  const { data: xg, isLoading: xgLoading } = useGetMatchXgAnalysis(matchId, {
+    query: { queryKey: getGetMatchXgAnalysisQueryKey(matchId), enabled: !!matchId }
   });
 
   const sortedEvents = useMemo(() => {
@@ -336,9 +342,132 @@ export default function MatchDetail() {
                 Bu maç için oran hesaplanamadı.
               </Card>
             )}
+
+            {xgLoading ? (
+              <Card className="bg-card border-border/50 h-64 animate-pulse"></Card>
+            ) : xg ? (
+              <Card className="bg-card border-border/50 p-5 border-t-4 border-t-purple-500">
+                <h3 className="text-base font-bold mb-4 uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Target className="w-4 h-4 text-purple-500" /> xG Analizi
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">Beklenen Gol (xG)</div>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-xs font-semibold mb-1">
+                          <span>{match.homeTeam.shortName}</span>
+                          <span>{xg.homeXg.toFixed(2)}</span>
+                        </div>
+                        <div className="flex h-2 rounded-full overflow-hidden bg-secondary">
+                          <div className="bg-purple-500 transition-all duration-500" style={{ width: `${Math.min(100, (xg.homeXg / Math.max(xg.homeXg, xg.awayXg, 1)) * 100)}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs font-semibold mb-1">
+                          <span>{match.awayTeam.shortName}</span>
+                          <span>{xg.awayXg.toFixed(2)}</span>
+                        </div>
+                        <div className="flex h-2 rounded-full overflow-hidden bg-secondary">
+                          <div className="bg-orange-500 transition-all duration-500" style={{ width: `${Math.min(100, (xg.awayXg / Math.max(xg.homeXg, xg.awayXg, 1)) * 100)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
+                    <div className="bg-secondary/30 rounded-lg p-3">
+                      <div className="text-[10px] text-muted-foreground font-semibold uppercase">Şut</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-purple-400 font-bold text-sm">{xg.homeShots}</span>
+                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className="text-orange-400 font-bold text-sm">{xg.awayShots}</span>
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3">
+                      <div className="text-[10px] text-muted-foreground font-semibold uppercase">İsabetli Şut</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-purple-400 font-bold text-sm">{xg.homeShotsOnTarget}</span>
+                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className="text-orange-400 font-bold text-sm">{xg.awayShotsOnTarget}</span>
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3">
+                      <div className="text-[10px] text-muted-foreground font-semibold uppercase">xG/Şut</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-purple-400 font-bold text-sm">{xg.homeXgPerShot.toFixed(3)}</span>
+                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className="text-orange-400 font-bold text-sm">{xg.awayXgPerShot.toFixed(3)}</span>
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3">
+                      <div className="text-[10px] text-muted-foreground font-semibold uppercase">Verimlilik</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`font-bold text-sm ${xg.homeEfficiency > 1 ? "text-green-400" : "text-red-400"}`}>{xg.homeEfficiency.toFixed(2)}x</span>
+                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className={`font-bold text-sm ${xg.awayEfficiency > 1 ? "text-green-400" : "text-red-400"}`}>{xg.awayEfficiency.toFixed(2)}x</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <BarChart3 className="w-3 h-3" /> Kazanma Olasılığı
+                    </div>
+                    <div className="flex h-3 rounded-full overflow-hidden bg-secondary">
+                      <div className="bg-purple-500 transition-all duration-500 text-[8px] font-bold flex items-center justify-center text-white" style={{ width: `${xg.winProbability.home * 100}%` }}>
+                        {xg.winProbability.home > 0.08 ? `${(xg.winProbability.home * 100).toFixed(0)}%` : ""}
+                      </div>
+                      <div className="bg-yellow-500 transition-all duration-500 text-[8px] font-bold flex items-center justify-center text-white" style={{ width: `${xg.winProbability.draw * 100}%` }}>
+                        {xg.winProbability.draw > 0.08 ? `${(xg.winProbability.draw * 100).toFixed(0)}%` : ""}
+                      </div>
+                      <div className="bg-orange-500 transition-all duration-500 text-[8px] font-bold flex items-center justify-center text-white" style={{ width: `${xg.winProbability.away * 100}%` }}>
+                        {xg.winProbability.away > 0.08 ? `${(xg.winProbability.away * 100).toFixed(0)}%` : ""}
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                      <span className="text-purple-400">{match.homeTeam.shortName}</span>
+                      <span className="text-yellow-400">Beraberlik</span>
+                      <span className="text-orange-400">{match.awayTeam.shortName}</span>
+                    </div>
+                  </div>
+
+                  {xg.homeXgTimeline.length > 0 && (match.status === "live" || match.status === "finished" || match.status === "halftime") && (
+                    <div className="pt-2 border-t border-border/50">
+                      <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" /> xG Zaman Çizelgesi
+                      </div>
+                      <div className="space-y-1">
+                        {xg.homeXgTimeline.map((point, i) => (
+                          <div key={i} className="grid grid-cols-[2rem_1fr_1fr] gap-1 items-center text-[10px]">
+                            <span className="text-muted-foreground font-medium text-right">{point.minute}'</span>
+                            <div className="flex h-1.5 rounded-full overflow-hidden bg-secondary">
+                              <div className="bg-purple-500/70" style={{ width: `${Math.min(100, (point.cumulativeHomeXg / Math.max(xg.homeXg, 0.5)) * 100)}%` }} />
+                            </div>
+                            <div className="flex h-1.5 rounded-full overflow-hidden bg-secondary">
+                              <div className="bg-orange-500/70" style={{ width: `${Math.min(100, (point.cumulativeAwayXg / Math.max(xg.awayXg, 0.5)) * 100)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                        <span className="text-purple-400">{match.homeTeam.shortName}</span>
+                        <span className="text-orange-400">{match.awayTeam.shortName}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="bg-secondary/30 border border-border/50 rounded-lg p-3 text-xs text-muted-foreground leading-relaxed">
+                      {xg.analysis}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ) : null}
           </div>
         </div>
-
       </div>
     </Layout>
   );

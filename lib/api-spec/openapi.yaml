@@ -190,6 +190,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /matches/{id}/xganalysis:
+    get:
+      operationId: getMatchXgAnalysis
+      tags: [matches]
+      summary: Get detailed xG analysis for a match
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: xG analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XgAnalysis"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /odds:
     get:
       operationId: listOdds
@@ -592,3 +617,100 @@ components:
         - analysis
         - expectedGoalsHome
         - expectedGoalsAway
+
+    XgAnalysis:
+      type: object
+      properties:
+        matchId:
+          type: string
+        homeXg:
+          type: number
+        awayXg:
+          type: number
+        homeXgPerShot:
+          type: number
+        awayXgPerShot:
+          type: number
+        homeShots:
+          type: integer
+        awayShots:
+          type: integer
+        homeShotsOnTarget:
+          type: integer
+        awayShotsOnTarget:
+          type: integer
+        homeXgDifference:
+          type: number
+        awayXgDifference:
+          type: number
+        homeEfficiency:
+          type: number
+        awayEfficiency:
+          type: number
+        homeXgTimeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/XgTimelinePoint"
+        awayXgTimeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/XgTimelinePoint"
+        winProbability:
+          type: object
+          properties:
+            home:
+              type: number
+            draw:
+              type: number
+            away:
+              type: number
+          required: [home, draw, away]
+        analysis:
+          type: string
+      required:
+        - matchId
+        - homeXg
+        - awayXg
+        - homeXgPerShot
+        - awayXgPerShot
+        - homeShots
+        - awayShots
+        - homeShotsOnTarget
+        - awayShotsOnTarget
+        - homeXgDifference
+        - awayXgDifference
+        - homeEfficiency
+        - awayEfficiency
+        - homeXgTimeline
+        - awayXgTimeline
+        - winProbability
+        - analysis
+
+    XgTimelinePoint:
+      type: object
+      properties:
+        minute:
+          type: integer
+        homeXg:
+          type: number
+        awayXg:
+          type: number
+        cumulativeHomeXg:
+          type: number
+        cumulativeAwayXg:
+          type: number
+        homeWinProb:
+          type: number
+        drawProb:
+          type: number
+        awayWinProb:
+          type: number
+      required:
+        - minute
+        - homeXg
+        - awayXg
+        - cumulativeHomeXg
+        - cumulativeAwayXg
+        - homeWinProb
+        - drawProb
+        - awayWinProb

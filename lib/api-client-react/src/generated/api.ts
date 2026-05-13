@@ -24,6 +24,7 @@ import type {
   MatchSummary,
   Odds,
   Standing,
+  XgAnalysis,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -820,6 +821,88 @@ export function useListOdds<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListOddsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get detailed xG analysis for a match
+ */
+export const getGetMatchXgAnalysisUrl = (id: string) => {
+  return `/api/matches/${id}/xganalysis`;
+};
+
+export const getMatchXgAnalysis = async (
+  id: string,
+  options?: RequestInit,
+): Promise<XgAnalysis> => {
+  return customFetch<XgAnalysis>(getGetMatchXgAnalysisUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMatchXgAnalysisQueryKey = (id: string) => {
+  return [`/api/matches/${id}/xganalysis`] as const;
+};
+
+export const getGetMatchXgAnalysisQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMatchXgAnalysis>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMatchXgAnalysis>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMatchXgAnalysisQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMatchXgAnalysis>>> =
+    ({ signal }) => getMatchXgAnalysis(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMatchXgAnalysis>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMatchXgAnalysisQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMatchXgAnalysis>>
+>;
+export type GetMatchXgAnalysisQueryError = ErrorType<ErrorResponse>;
+
+export function useGetMatchXgAnalysis<
+  TData = Awaited<ReturnType<typeof getMatchXgAnalysis>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMatchXgAnalysis>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMatchXgAnalysisQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

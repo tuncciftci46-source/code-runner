@@ -216,6 +216,43 @@ export interface Odds {
   expectedGoalsAway: number;
 }
 
+export interface XgTimelinePoint {
+  minute: number;
+  homeXg: number;
+  awayXg: number;
+  cumulativeHomeXg: number;
+  cumulativeAwayXg: number;
+  homeWinProb: number;
+  drawProb: number;
+  awayWinProb: number;
+}
+
+export interface WinProbability {
+  home: number;
+  draw: number;
+  away: number;
+}
+
+export interface XgAnalysis {
+  matchId: string;
+  homeXg: number;
+  awayXg: number;
+  homeXgPerShot: number;
+  awayXgPerShot: number;
+  homeShots: number;
+  awayShots: number;
+  homeShotsOnTarget: number;
+  awayShotsOnTarget: number;
+  homeXgDifference: number;
+  awayXgDifference: number;
+  homeEfficiency: number;
+  awayEfficiency: number;
+  homeXgTimeline: XgTimelinePoint[];
+  awayXgTimeline: XgTimelinePoint[];
+  winProbability: WinProbability;
+  analysis: string;
+}
+
 export type ListMatchesParams = {
   status?: ListMatchesStatus;
   /**

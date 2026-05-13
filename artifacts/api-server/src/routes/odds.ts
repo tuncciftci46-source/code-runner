@@ -19,7 +19,8 @@ router.get("/odds", async (_req, res): Promise<void> => {
       m.homeTeam.form,
       m.awayTeam.form,
       m.homeTeam.name,
-      m.awayTeam.name
+      m.awayTeam.name,
+      m.leagueSlug
     ));
 
   res.json(ListOddsResponse.parse(odds));
@@ -46,7 +47,8 @@ router.get("/odds/:matchId", async (req, res): Promise<void> => {
     match.homeTeam.form,
     match.awayTeam.form,
     match.homeTeam.name,
-    match.awayTeam.name
+    match.awayTeam.name,
+    match.leagueSlug
   );
 
   res.json(GetOddsResponse.parse(odds));
